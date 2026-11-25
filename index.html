@@ -1106,51 +1106,65 @@ SHOW TABLES;                   -- 14 rows
 <div class="inline-fig-pair"><figure class="inline-fig" data-open-fig="43" tabindex="0" role="button" aria-label="Enlarge Figure 43: Crow&#x27;s Foot ERD (1C) — Mailbox Organization &amp;amp; Contacts (folders, labels, email_labels, contacts)."><div class="inline-fig-frame"><img data-fig-src="43" alt="Figure 43" loading="lazy" decoding="async" /><span class="fig-zoom-pill" aria-hidden="true">Click to enlarge</span></div><figcaption><span class="fig-num">Figure 43</span> <span>Crow's Foot ERD (1C) — Mailbox Organization &amp; Contacts (<code>folders</code>, <code>labels</code>, <code>email_labels</code>, <code>contacts</code>).</span></figcaption></figure><figure class="inline-fig" data-open-fig="44" tabindex="0" role="button" aria-label="Enlarge Figure 44: Crow&#x27;s Foot ERD (1D) — Scheduled Dispatch, Delivery Tracking &amp;amp; Notifications (scheduled_emails, delivery_status, notifications)."><div class="inline-fig-frame"><img data-fig-src="44" alt="Figure 44" loading="lazy" decoding="async" /><span class="fig-zoom-pill" aria-hidden="true">Click to enlarge</span></div><figcaption><span class="fig-num">Figure 44</span> <span>Crow's Foot ERD (1D) — Scheduled Dispatch, Delivery Tracking &amp; Notifications (<code>scheduled_emails</code>, <code>delivery_status</code>, <code>notifications</code>).</span></figcaption></figure></div>
 <figure class="inline-fig" data-open-fig="45" tabindex="0" role="button" aria-label="Enlarge Figure 45: Crow&#x27;s Foot ERD (1E) — Spam Moderation, Blocking &amp;amp; Security Audit (spam_reports, blocked_senders, system_logs)."><div class="inline-fig-frame"><img data-fig-src="45" alt="Figure 45" loading="lazy" decoding="async" /><span class="fig-zoom-pill" aria-hidden="true">Click to enlarge</span></div><figcaption><span class="fig-num">Figure 45</span> <span>Crow's Foot ERD (1E) — Spam Moderation, Blocking &amp; Security Audit (<code>spam_reports</code>, <code>blocked_senders</code>, <code>system_logs</code>).</span></figcaption></figure>
 
-<h4>Full ERD walkthrough — Figures 1A to 1E (Figures 41–45)</h4>
-<p>Every team member can explain Couriva's 14-table <code>webmail</code> database by walking through the 5 Crow's Foot ERD plates below:</p>
+<h4>Full ERD walkthrough — Spoon-feed guide (Figures 1A to 1E / Figs. 41–45)</h4>
+<p><strong>How to read Crow's Foot symbols in 10 seconds:</strong> a single bar (<code>|</code>) means <strong>ONE</strong>, a three-prong crow's foot (<code>&lt;</code>) means <strong>MANY</strong>, and a circle (<code>o</code>) means <strong>OPTIONAL (can be NULL / 0)</strong>. So <code>|──o&lt;</code> means <em>"one parent can have zero, one, or many children."</em></p>
 
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>ERD Plate</th>
-<th>Tables &amp; Keys</th>
-<th>Relationships &amp; Cardinalities</th>
-<th>How it works (Defense Summary)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Figure 1A (Fig. 41)</strong><br>Core Identity &amp; Messaging</td>
-<td><code>users</code> (PK <code>id</code>, self-FK <code>reviewed_by</code>)<br><code>emails</code> (PK <code>id</code>, FKs <code>sender_id</code>, <code>recipient_id</code>, <code>parent_email_id</code>, <code>custom_folder_id</code>)<br><code>folders</code> (PK <code>id</code>, FK <code>user_id</code>)</td>
-<td><code>users (1) ──&lt; (N) emails</code> (sent &amp; received)<br><code>emails (1) ──&lt; (N) emails</code> (self-FK <code>parent_email_id</code> for threads)<br><code>folders (1) ──&lt; (N) emails</code> (<code>ON DELETE SET NULL</code>)</td>
-<td>Central backbone: every user authenticates via AD (<code>ad_object_guid</code>, <code>auth_source</code>) or break-glass local, sends/receives rows in <code>emails</code>, and groups replies into threads via <code>parent_email_id</code>.</td>
-</tr>
-<tr>
-<td><strong>Figure 1B (Fig. 42)</strong><br>Recipients &amp; Attachments</td>
-<td><code>email_recipients</code> (PK <code>id</code>, FKs <code>email_id</code>, <code>recipient_id</code>)<br><code>attachments</code> (PK <code>id</code>, FK <code>email_id</code>)</td>
-<td><code>emails (1) ──&lt; (N) email_recipients</code> (<code>ON DELETE CASCADE</code>)<br><code>users (1) ──o&lt; (N) email_recipients</code> (<code>ON DELETE SET NULL</code>)<br><code>emails (1) ──&lt; (N) attachments</code> (<code>ON DELETE CASCADE</code>)</td>
-<td>Normalizes To/Cc/Bcc recipients per message (preserving <code>email_address</code> snapshots even if a user is deleted) and links uploaded files to randomized non-executable paths in <code>storage/attachments/</code>.</td>
-</tr>
-<tr>
-<td><strong>Figure 1C (Fig. 43)</strong><br>Mailbox Organization &amp; Contacts</td>
-<td><code>folders</code> (PK <code>id</code>, FK <code>user_id</code>)<br><code>labels</code> (PK <code>id</code>, FK <code>user_id</code>)<br><code>email_labels</code> (PK/FKs <code>email_id</code>, <code>label_id</code>)<br><code>contacts</code> (PK <code>id</code>, FK <code>user_id</code>)</td>
-<td><code>users (1) ──&lt; (N) folders</code>, <code>labels</code>, <code>contacts</code><br><code>emails (M) ──&lt; email_labels &gt;── (N) labels</code> (M:N junction, <code>ON DELETE CASCADE</code>)</td>
-<td>Gives each user isolated custom folders, color-coded labels (many-to-many via <code>email_labels</code>), and a personal address book (<code>contacts</code>) with zero cross-user leakage.</td>
-</tr>
-<tr>
-<td><strong>Figure 1D (Fig. 44)</strong><br>Scheduled Dispatch, Delivery &amp; Notifications</td>
-<td><code>scheduled_emails</code> (PK <code>id</code>, FKs <code>user_id</code>, <code>draft_email_id</code>, <code>sent_email_id</code>)<br><code>delivery_status</code> (PK <code>id</code>, FK <code>email_id</code>)<br><code>notifications</code> (PK <code>id</code>, FK <code>user_id</code>)</td>
-<td><code>users (1) ──&lt; (N) scheduled_emails</code> &amp; <code>notifications</code><br><code>emails (1) ──&lt; (N) scheduled_emails</code> (draft + sent links)<br><code>emails (1) ──&lt; (N) delivery_status</code> (<code>ON DELETE CASCADE</code>)</td>
-<td><code>bin/process_scheduled.php</code> claims due rows in <code>scheduled_emails</code> (<code>scheduled</code> → <code>processing</code>), records per-recipient idempotency &amp; retry state in <code>delivery_status</code>, and creates recipient alerts in <code>notifications</code>.</td>
-</tr>
-<tr>
-<td><strong>Figure 1E (Fig. 45)</strong><br>Spam Moderation, Blocking &amp; Audit</td>
-<td><code>blocked_senders</code> (PK <code>id</code>, FK <code>user_id</code>)<br><code>spam_reports</code> (PK <code>id</code>, FKs <code>reporter_id</code>, <code>email_id</code>, <code>reviewer_id</code>)<br><code>system_logs</code> (PK <code>id</code>, FK <code>user_id</code>)</td>
-<td><code>users (1) ──&lt; (N) blocked_senders</code> &amp; <code>system_logs</code><br><code>users (1) ──&lt; (N) spam_reports</code> (as reporter &amp; admin reviewer)<br><code>emails (1) ──&lt; (N) spam_reports</code> (<code>ON DELETE CASCADE</code>)</td>
-<td>Powers per-user silent sender blocking, privacy-isolated single-message spam triage (admin sees only the linked <code>email_id</code>), and immutable security/governance auditing in <code>system_logs</code>.</td>
-</tr>
-</tbody>
-</table></div>
+<div class="callout callout-info">
+  <div class="callout-title">Figure 1A (Fig. 41) — Core Identity &amp; Messaging (<code>users</code>, <code>emails</code>, <code>folders</code>)</div>
+  <p><strong>Plain-English story:</strong> Everything starts with a person (<code>users</code>) sending or receiving a message (<code>emails</code>), and optionally filing it into a personal folder (<code>folders</code>).</p>
+  <ul>
+    <li><code>users (1) ──&lt; (N) emails</code> via <code>sender_id</code>: One user can send many emails, but every email has one sender.</li>
+    <li><code>users (1) ──o&lt; (N) emails</code> via <code>recipient_id</code>: One user can receive many emails (<code>recipient_id</code> can be <code>NULL</code> for drafts/multi-recipient).</li>
+    <li><code>emails (1) ──o&lt; (N) emails</code> via <code>parent_email_id</code> (self-relationship): A reply points back to its parent email so Couriva builds a conversation thread in <code>public/read.php</code>.</li>
+    <li><code>folders (1) ──o&lt; (N) emails</code> via <code>custom_folder_id</code> (<code>ON DELETE SET NULL</code>): One custom folder can hold many emails; deleting the folder keeps the emails safe and just clears <code>custom_folder_id</code>.</li>
+    <li><code>users (1) ──o&lt; (N) users</code> via <code>reviewed_by</code>: Records which admin reviewed a user account.</li>
+  </ul>
+  <p><strong>If a panelist points at Fig. 1A, say:</strong> <em>"Figure 1A is the core mailbox backbone: <code>users</code> stores Active Directory-linked accounts (<code>ad_object_guid</code>, <code>auth_source</code>), and <code>emails</code> links senders, recipients, custom folders, and self-referencing <code>parent_email_id</code> threads."</em></p>
+</div>
+
+<div class="callout callout-info">
+  <div class="callout-title">Figure 1B (Fig. 42) — Recipients &amp; Attachments (<code>email_recipients</code>, <code>attachments</code>)</div>
+  <p><strong>Plain-English story:</strong> One email can go to multiple people (To, Cc, Bcc) and carry multiple files—so we store them in child tables instead of squeezing lists into one column.</p>
+  <ul>
+    <li><code>emails (1) ──&lt; (N) email_recipients</code> (<code>ON DELETE CASCADE</code>): One email has one or more normalized recipient rows (<code>recipient_type</code> = <code>to</code>, <code>cc</code>, or <code>bcc</code>). Deleting the email deletes its recipient rows automatically.</li>
+    <li><code>users (1) ──o&lt; (N) email_recipients</code> (<code>ON DELETE SET NULL</code>): Links to the recipient's user row if they exist, while always keeping <code>email_address</code> as a permanent text snapshot.</li>
+    <li><code>emails (1) ──&lt; (N) attachments</code> (<code>ON DELETE CASCADE</code>): One email can have many uploaded files. Each row stores the user's <code>original_filename</code>, randomized <code>stored_filename</code>, <code>mime_type</code>, and byte size; the file bytes live safely in non-executable <code>storage/attachments/</code>.</li>
+  </ul>
+  <p><strong>If a panelist points at Fig. 1B, say:</strong> <em>"Figure 1B normalizes multi-recipient To/Cc/Bcc addressing and file attachments into 1-to-many child tables with cascading deletes when a message is permanently purged."</em></p>
+</div>
+
+<div class="callout callout-info">
+  <div class="callout-title">Figure 1C (Fig. 43) — Mailbox Organization &amp; Contacts (<code>folders</code>, <code>labels</code>, <code>email_labels</code>, <code>contacts</code>)</div>
+  <p><strong>Plain-English story:</strong> Each user organizes their own mailbox privately—custom folders, color labels, and personal contacts belong strictly to one <code>user_id</code>.</p>
+  <ul>
+    <li><code>users (1) ──&lt; (N) folders</code> &amp; <code>users (1) ──&lt; (N) labels</code> &amp; <code>users (1) ──&lt; (N) contacts</code> (all <code>ON DELETE CASCADE</code>): One user owns many folders, many color-coded labels, and many personal contacts. No user can ever see another user's folders or contacts.</li>
+    <li><code>emails (M) ──&lt; email_labels &gt;── (N) labels</code> (Many-to-Many bridge table): One email can have multiple labels (e.g., <em>Urgent</em> + <em>Project</em>), and one label can tag many emails. <code>email_labels</code> resolves this M:N relationship using a composite key (<code>email_id</code>, <code>label_id</code>).</li>
+  </ul>
+  <p><strong>If a panelist points at Fig. 1C, say:</strong> <em>"Figure 1C models per-user mailbox organization: <code>folders</code>, <code>labels</code>, and <code>contacts</code> are 1-to-many from <code>users</code>, while <code>email_labels</code> is the many-to-many junction table between <code>emails</code> and <code>labels</code>."</em></p>
+</div>
+
+<div class="callout callout-info">
+  <div class="callout-title">Figure 1D (Fig. 44) — Scheduled Dispatch, Delivery &amp; Notifications (<code>scheduled_emails</code>, <code>delivery_status</code>, <code>notifications</code>)</div>
+  <p><strong>Plain-English story:</strong> When a user clicks <em>Schedule</em>, the message waits safely in a queue until Task Scheduler runs <code>bin/process_scheduled.php</code> every minute, tracks delivery, and alerts the recipient.</p>
+  <ul>
+    <li><code>users (1) ──&lt; (N) scheduled_emails</code>: One user can queue many future-dated emails.</li>
+    <li><code>emails (1) ──&lt; (N) scheduled_emails</code> via <code>draft_email_id</code> and <code>sent_email_id</code>: Links the queued job to the draft before sending, and to the final sent email afterward. Status moves atomically <code>scheduled → processing → sent</code> so two worker runs can never double-send.</li>
+    <li><code>emails (1) ──&lt; (N) delivery_status</code> (<code>ON DELETE CASCADE</code>): Tracks per-recipient delivery state (<code>queued</code>, <code>delivered</code>, <code>sent</code>, <code>failed</code>, <code>bounced</code>), idempotency key, and retry count.</li>
+    <li><code>users (1) ──&lt; (N) notifications</code> (<code>ON DELETE CASCADE</code>): Stores unread/read in-app alerts when new mail arrives.</li>
+  </ul>
+  <p><strong>If a panelist points at Fig. 1D, say:</strong> <em>"Figure 1D powers reliable background sending: <code>scheduled_emails</code> locks due drafts for the 1-minute Task Scheduler worker, <code>delivery_status</code> guarantees idempotency, and <code>notifications</code> alerts recipients."</em></p>
+</div>
+
+<div class="callout callout-info">
+  <div class="callout-title">Figure 1E (Fig. 45) — Spam Moderation, Blocking &amp; Audit (<code>blocked_senders</code>, <code>spam_reports</code>, <code>system_logs</code>)</div>
+  <p><strong>Plain-English story:</strong> Users can silently block unwanted senders or report a suspicious message to an admin—without letting the admin read the rest of their inbox—and every security action is logged.</p>
+  <ul>
+    <li><code>users (1) ──&lt; (N) blocked_senders</code> (<code>ON DELETE CASCADE</code>): One user can block many sender addresses; future mail from them routes silently to Spam.</li>
+    <li><code>users (1) ──&lt; (N) spam_reports</code> (as <code>reporter_id</code> and admin <code>reviewer_id</code>) &amp; <code>emails (1) ──&lt; (N) spam_reports</code> (<code>ON DELETE CASCADE</code>): Ties a report to <em>only one specific</em> <code>email_id</code> so <code>admin/spam-reports.php</code> stays privacy-isolated.</li>
+    <li><code>users (1) ──o&lt; (N) system_logs</code> (<code>ON DELETE SET NULL</code>): Immutable audit trail of logins, failed auth, password changes, and admin governance actions.</li>
+  </ul>
+  <p><strong>If a panelist points at Fig. 1E, say:</strong> <em>"Figure 1E handles safety and accountability: <code>blocked_senders</code> enforces per-user blocks, <code>spam_reports</code> exposes only the single reported <code>email_id</code> to admins, and <code>system_logs</code> records all security events."</em></p>
+</div>
 
 <h3 id="63-schema-and-migrations">6.3 Schema and migrations</h3>
 <p><code>database/schema.sql</code> is the canonical DDL (no <code>USE</code>, safe for disposable DBs). Migration ledger:</p>
